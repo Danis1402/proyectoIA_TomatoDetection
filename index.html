@@ -140,6 +140,7 @@
     .camera-select { display: grid; gap: 5px; color: var(--muted); font-size: 10px; }
     .camera-select select { width: min(250px, 42vw); min-width: 150px; height: 37px; padding: 0 9px; border: 1px solid var(--line); border-radius: 4px; background: white; color: var(--ink); font: 11px var(--sans); }
     .camera-controls .control-button:disabled, .camera-select select:disabled { opacity: .55; cursor: not-allowed; }
+    .vision-status { flex: 1 1 100%; min-height: 16px; color: var(--muted); font: 10px var(--mono); }
     .camera-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .camera-card { overflow: hidden; }
     .camera-head { display: flex; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid var(--line); }
@@ -151,6 +152,7 @@
     .camera-image.local-active img { display: none; }
     .camera-image.local-active video { display: block; }
     .camera-image.local-active .crosshair, .camera-image.local-active .detection-label { display: none; }
+    .vision-box { position: absolute; z-index: 1; border: 2px solid #e45b3e; box-shadow: 0 0 0 1px #fff; pointer-events: none; }
     .camera-overlay { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(transparent 72%, #17251c55); }
     .crosshair { position: absolute; left: 52%; top: 47%; width: 34px; height: 34px; transform: translate(-50%, -50%); border: 1px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #263a2b66; }
     .crosshair::before, .crosshair::after { content: ""; position: absolute; background: white; }
@@ -302,6 +304,9 @@
         <label class="camera-select" for="camera-device-right">Vista derecha<select id="camera-device-right"><option value="">Buscando cámaras…</option></select></label>
         <button class="control-button" id="camera-refresh" type="button">Detectar cámaras</button>
         <button class="control-button" id="camera-connect" type="button">Activar cámaras</button>
+        <button class="control-button" id="vision-connect" type="button">Conectar OpenCV</button>
+        <button class="control-button" id="calibration-capture" type="button" disabled>Guardar par de calibración</button>
+        <span class="vision-status" id="vision-status" role="status">API local desconectada. Activa las dos cámaras antes de conectar.</span>
       </div>
       <div class="camera-grid">
         <article class="panel camera-card">
@@ -353,6 +358,11 @@
     const cameraDeviceSelects = [document.querySelector("#camera-device-left"), document.querySelector("#camera-device-right")];
     const cameraRefreshButton = document.querySelector("#camera-refresh");
     const cameraConnectButton = document.querySelector("#camera-connect");
+    const visionConnectButton = document.querySelector("#vision-connect");
+    const calibrationCaptureButton = document.querySelector("#calibration-capture");
+    const visionStatus = document.querySelector("#vision-status");
+    const visionCanvases = [document.createElement("canvas"), document.createElement("canvas")];
+    const visionContexts = visionCanvases.map(sourceCanvas => sourceCanvas.getContext("2d"));
     const cameraStamps = [...document.querySelectorAll(".image-stamp")];
     const cameraEmptyStates = [...document.querySelectorAll(".camera-empty-state")];
     const cameraIsLive = [false, false];
@@ -360,6 +370,9 @@
     const tomatoList = document.querySelector("#tomato-list");
     const modeInputs = [...document.querySelectorAll("input[name='operation-mode']")];
     const state = { mode: "manual", source: "simulation", paused: false, q: [0, 0, 0, 0], targetQ: [0, 0, 0, 0], sensorTarget: null, tomatoes: [], socket: null };
+    let visionSocket = null;
+    let visionTimer = null;
+    let visionFramePending = false;
     let previousQ = [...state.q];
     let previousFrame = performance.now();
 
@@ -467,6 +480,7 @@
     cameraRefreshButton.addEventListener("click", refreshCameraDevices);
     cameraConnectButton.addEventListener("click", () => {
       if (cameraStreams.some(Boolean)) {
+        if (visionSocket) visionSocket.close();
         cameraStreams.forEach((stream, index) => { if (stream) stopLocalCamera(index); });
         cameraConnectButton.textContent = "Activar cámaras";
         document.querySelector(".sensor-help").textContent = "Cámaras locales desactivadas.";
@@ -476,6 +490,133 @@
     });
     navigator.mediaDevices?.addEventListener?.("devicechange", refreshCameraDevices);
     refreshCameraDevices();
+
+    function renderVisionBoxes(index, detections, frameWidth, frameHeight) {
+      const container = cameraVideos[index].closest(".camera-image");
+      container.querySelectorAll(".vision-box").forEach(box => box.remove());
+      detections.forEach(detection => {
+        const [x, y, width, height] = detection.bbox;
+        const box = document.createElement("span");
+        box.className = "vision-box";
+        box.style.left = `${x / frameWidth * 100}%`;
+        box.style.top = `${y / frameHeight * 100}%`;
+        box.style.width = `${width / frameWidth * 100}%`;
+        box.style.height = `${height / frameHeight * 100}%`;
+        container.append(box);
+      });
+    }
+
+    function renderVisionResult(result) {
+      const frameWidth = visionCanvases[0].width;
+      const frameHeight = visionCanvases[0].height;
+      renderVisionBoxes(0, result.left_detections, frameWidth, frameHeight);
+      renderVisionBoxes(1, result.right_detections, frameWidth, frameHeight);
+      tomatoList.replaceChildren();
+      if (result.tomatoes.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "tomato-empty";
+        empty.textContent = "OpenCV no detectó tomates rojos emparejados en ambas cámaras.";
+        tomatoList.append(empty);
+      } else {
+        result.tomatoes.forEach(tomato => {
+          const row = document.createElement("li");
+          row.className = "tomato-row";
+          const description = document.createElement("div");
+          const title = document.createElement("strong");
+          title.textContent = `Tomate ${tomato.id}${tomato.z_cm === undefined ? " · sin profundidad calibrada" : ` · Z ${tomato.z_cm.toFixed(2)} cm`}`;
+          const details = document.createElement("span");
+          details.textContent = tomato.z_cm === undefined
+            ? `Centro en cámara izquierda: (${tomato.x_px.toFixed(0)}, ${tomato.y_px.toFixed(0)}) px`
+            : `Cámara izquierda: X ${tomato.x_cm.toFixed(2)} · Y ${tomato.y_cm.toFixed(2)} · Z ${tomato.z_cm.toFixed(2)} cm`;
+          description.append(title, details);
+          row.append(description);
+          tomatoList.append(row);
+        });
+      }
+      cameraTarget.textContent = result.calibrated
+        ? `Posiciones en el marco de la cámara izquierda, no en la base del robot. ${result.status}`
+        : result.status;
+      visionStatus.textContent = result.status;
+    }
+
+    function sendVisionFrames() {
+      if (visionSocket?.readyState !== WebSocket.OPEN || visionFramePending) return;
+      if (cameraVideos.some(video => video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)) return;
+      const frames = cameraVideos.map((video, index) => {
+        const width = 640;
+        const height = Math.max(1, Math.round(width * video.videoHeight / video.videoWidth));
+        const sourceCanvas = visionCanvases[index];
+        sourceCanvas.width = width;
+        sourceCanvas.height = height;
+        visionContexts[index].drawImage(video, 0, 0, width, height);
+        return sourceCanvas.toDataURL("image/jpeg", 0.65);
+      });
+      visionFramePending = true;
+      visionSocket.send(JSON.stringify({ type: "frames", left: frames[0], right: frames[1] }));
+    }
+
+    function connectVisionAPI() {
+      if (location.protocol !== "http:" && location.protocol !== "https:") {
+        visionStatus.textContent = "Abre la página desde http://localhost:8000 para conectar la API local.";
+        return;
+      }
+      if (!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+        visionStatus.textContent = "La API OpenCV debe ejecutarse en esta computadora; abre la página desde localhost.";
+        return;
+      }
+      if (cameraStreams.some(stream => !stream)) {
+        visionStatus.textContent = "Activa las dos cámaras locales antes de conectar OpenCV.";
+        return;
+      }
+      visionSocket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws`);
+      visionConnectButton.disabled = true;
+      visionStatus.textContent = "Conectando con la API local…";
+      visionSocket.addEventListener("open", () => {
+        visionConnectButton.disabled = false;
+        visionConnectButton.textContent = "Desconectar OpenCV";
+        calibrationCaptureButton.disabled = false;
+        visionStatus.textContent = "API conectada; enviando pares de imágenes a 5 FPS.";
+        visionTimer = window.setInterval(sendVisionFrames, 200);
+      });
+      visionSocket.addEventListener("message", event => {
+        visionFramePending = false;
+        try {
+          const result = JSON.parse(event.data);
+          if (result.type === "detections") renderVisionResult(result);
+          else if (result.type === "calibration_saved") visionStatus.textContent = `Par ${result.pair} guardado. Captura más posiciones del tablero.`;
+          else if (result.type === "error") visionStatus.textContent = result.status;
+        } catch (error) {
+          visionStatus.textContent = `Respuesta inválida de OpenCV: ${error.message}`;
+        }
+      });
+      visionSocket.addEventListener("close", () => {
+        window.clearInterval(visionTimer);
+        visionTimer = null;
+        visionFramePending = false;
+        visionSocket = null;
+        visionConnectButton.disabled = false;
+        visionConnectButton.textContent = "Conectar OpenCV";
+        calibrationCaptureButton.disabled = true;
+        visionStatus.textContent = "API OpenCV desconectada.";
+      });
+      visionSocket.addEventListener("error", () => {
+        visionStatus.textContent = "No responde la API local. Inicia vision_server.py en esta computadora.";
+      });
+    }
+
+    visionConnectButton.addEventListener("click", () => {
+      if (visionSocket) {
+        visionSocket.close();
+        return;
+      }
+      connectVisionAPI();
+    });
+    calibrationCaptureButton.addEventListener("click", () => {
+      if (visionSocket?.readyState === WebSocket.OPEN) {
+        visionSocket.send(JSON.stringify({ type: "capture_calibration" }));
+        visionStatus.textContent = "Guardando el último par de cuadros…";
+      }
+    });
 
     function solveInverseKinematics(target, elbow) {
       const beta = radians(target.beta);

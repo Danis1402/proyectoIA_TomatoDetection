@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+.venv/
+calibration_images/
+stereo_calibration.npz
