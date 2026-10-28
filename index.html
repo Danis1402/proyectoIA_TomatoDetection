@@ -136,6 +136,10 @@
     .camera-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
     .camera-heading .section-title { margin-bottom: 0; }
     .camera-heading p { margin: 0; color: var(--muted); font-size: 11px; }
+    .camera-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-bottom: 14px; }
+    .camera-select { display: grid; gap: 5px; color: var(--muted); font-size: 10px; }
+    .camera-select select { width: min(250px, 42vw); min-width: 150px; height: 37px; padding: 0 9px; border: 1px solid var(--line); border-radius: 4px; background: white; color: var(--ink); font: 11px var(--sans); }
+    .camera-controls .control-button:disabled, .camera-select select:disabled { opacity: .55; cursor: not-allowed; }
     .camera-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .camera-card { overflow: hidden; }
     .camera-head { display: flex; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid var(--line); }
@@ -143,6 +147,10 @@
     .camera-head span { color: var(--muted); font: 10px var(--mono); }
     .camera-image { position: relative; height: clamp(190px, 24vw, 300px); overflow: hidden; background: #dce4d5; }
     .camera-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .camera-image video { display: none; width: 100%; height: 100%; object-fit: cover; }
+    .camera-image.local-active img { display: none; }
+    .camera-image.local-active video { display: block; }
+    .camera-image.local-active .crosshair, .camera-image.local-active .detection-label { display: none; }
     .camera-overlay { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(transparent 72%, #17251c55); }
     .crosshair { position: absolute; left: 52%; top: 47%; width: 34px; height: 34px; transform: translate(-50%, -50%); border: 1px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #263a2b66; }
     .crosshair::before, .crosshair::after { content: ""; position: absolute; background: white; }
@@ -179,6 +187,8 @@
       .axis-visual { min-height: 135px; }
       .joint-table th, .joint-table td { padding-right: 9px; padding-left: 9px; }
       .camera-heading { align-items: flex-start; flex-direction: column; }
+      .camera-select { flex: 1 1 100%; }
+      .camera-select select { width: 100%; }
       .camera-grid { grid-template-columns: 1fr; }
       .camera-image { height: 220px; }
       .footer { flex-direction: column; }
@@ -285,24 +295,32 @@
     <section class="camera-section" id="camaras" aria-labelledby="camera-title">
       <div class="camera-heading">
         <h2 class="section-title" id="camera-title"><span>02</span> Visión estereoscópica</h2>
-        <p>Par estéreo · calibración de cámaras pendiente</p>
+        <p>Selecciona los dispositivos para la vista izquierda y derecha</p>
+      </div>
+      <div class="camera-controls" aria-label="Controles de cámaras locales">
+        <label class="camera-select" for="camera-device-left">Vista izquierda<select id="camera-device-left"><option value="">Buscando cámaras…</option></select></label>
+        <label class="camera-select" for="camera-device-right">Vista derecha<select id="camera-device-right"><option value="">Buscando cámaras…</option></select></label>
+        <button class="control-button" id="camera-refresh" type="button">Detectar cámaras</button>
+        <button class="control-button" id="camera-connect" type="button">Activar cámaras</button>
       </div>
       <div class="camera-grid">
         <article class="panel camera-card">
-          <div class="camera-head"><strong>Cámara izquierda</strong><span>DEMO · CAM-L</span></div>
+          <div class="camera-head"><strong>Cámara izquierda</strong><span>CAM-L</span></div>
           <div class="camera-image">
             <img src="https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&amp;fit=crop&amp;w=1200&amp;q=85" alt="Imagen ilustrativa de tomates para la cámara izquierda">
+            <video id="camera-video-left" autoplay muted playsinline aria-label="Vista en vivo de la cámara izquierda"></video>
             <div class="camera-overlay"></div><span class="crosshair" aria-hidden="true"></span><span class="detection-label">TOMATE 01 · 96.2%</span><span class="image-stamp">CAPTURA SIMULADA · CAM-L</span>
-            <div class="camera-empty-state"><strong>No se detecta la cámara</strong><span>Esperando imagen del sensor estéreo</span></div>
+            <div class="camera-empty-state"><strong>Vista de demostración</strong><span>Activa una cámara local o conecta el flujo de sensores</span></div>
           </div>
           <div class="camera-info"><span>Imagen <strong id="camera-kind-left">ilustrativa</strong></span><span id="camera-status-left">Sin flujo en vivo</span></div>
         </article>
         <article class="panel camera-card">
-          <div class="camera-head"><strong>Cámara derecha</strong><span>DEMO · CAM-R</span></div>
+          <div class="camera-head"><strong>Cámara derecha</strong><span>CAM-R</span></div>
           <div class="camera-image">
             <img src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&amp;fit=crop&amp;w=1200&amp;q=85" alt="Imagen ilustrativa de tomates para la cámara derecha">
+            <video id="camera-video-right" autoplay muted playsinline aria-label="Vista en vivo de la cámara derecha"></video>
             <div class="camera-overlay"></div><span class="crosshair" aria-hidden="true"></span><span class="detection-label">TOMATE 01 · 96.2%</span><span class="image-stamp">CAPTURA SIMULADA · CAM-R</span>
-            <div class="camera-empty-state"><strong>No se detecta la cámara</strong><span>Esperando imagen del sensor estéreo</span></div>
+            <div class="camera-empty-state"><strong>Vista de demostración</strong><span>Activa una cámara local o conecta el flujo de sensores</span></div>
           </div>
           <div class="camera-info"><span>Imagen <strong id="camera-kind-right">ilustrativa</strong></span><span id="camera-status-right">Sin flujo en vivo</span></div>
         </article>
@@ -331,14 +349,133 @@
     const sensorButton = document.querySelector("#sensor-connect");
     const cameraTarget = document.querySelector("#camera-target");
     const cameraImages = [...document.querySelectorAll(".camera-image img")];
+    const cameraVideos = [document.querySelector("#camera-video-left"), document.querySelector("#camera-video-right")];
+    const cameraDeviceSelects = [document.querySelector("#camera-device-left"), document.querySelector("#camera-device-right")];
+    const cameraRefreshButton = document.querySelector("#camera-refresh");
+    const cameraConnectButton = document.querySelector("#camera-connect");
     const cameraStamps = [...document.querySelectorAll(".image-stamp")];
     const cameraEmptyStates = [...document.querySelectorAll(".camera-empty-state")];
     const cameraIsLive = [false, false];
+    const cameraStreams = [null, null];
     const tomatoList = document.querySelector("#tomato-list");
     const modeInputs = [...document.querySelectorAll("input[name='operation-mode']")];
     const state = { mode: "manual", source: "simulation", paused: false, q: [0, 0, 0, 0], targetQ: [0, 0, 0, 0], sensorTarget: null, tomatoes: [], socket: null };
     let previousQ = [...state.q];
     let previousFrame = performance.now();
+
+    async function refreshCameraDevices() {
+      if (!navigator.mediaDevices?.enumerateDevices) {
+        document.querySelector(".sensor-help").textContent = "El navegador no permite acceder a cámaras. Abre la página desde localhost o HTTPS.";
+        return;
+      }
+      const previousSelection = cameraDeviceSelects.map(select => select.value);
+      try {
+        const devices = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === "videoinput");
+        cameraDeviceSelects.forEach((select, index) => {
+          select.replaceChildren();
+          devices.forEach((device, deviceIndex) => {
+            const option = document.createElement("option");
+            option.value = device.deviceId;
+            option.textContent = device.label || `Cámara disponible ${deviceIndex + 1}`;
+            select.append(option);
+          });
+          if (devices.length === 0) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "No se encontraron cámaras";
+            select.append(option);
+          }
+          const retained = devices.some(device => device.deviceId === previousSelection[index]);
+          if (retained) select.value = previousSelection[index];
+          else if (devices[index]) select.value = devices[index].deviceId;
+          select.disabled = devices.length === 0 || Boolean(cameraStreams[index]);
+        });
+        if (devices.length === 0) document.querySelector(".sensor-help").textContent = "No se encontraron cámaras de video disponibles en este dispositivo.";
+        else document.querySelector(".sensor-help").textContent = `${devices.length} cámara(s) disponible(s). El navegador solicitará permiso al activarlas.`;
+      } catch (error) {
+        document.querySelector(".sensor-help").textContent = `No se pudieron detectar las cámaras: ${error.message}`;
+      }
+    }
+
+    function stopLocalCamera(index) {
+      cameraStreams[index]?.getTracks().forEach(track => track.stop());
+      cameraStreams[index] = null;
+      cameraVideos[index].srcObject = null;
+      cameraVideos[index].closest(".camera-image").classList.remove("local-active");
+      cameraDeviceSelects[index].disabled = false;
+      const side = index === 0 ? "left" : "right";
+      cameraEmptyStates[index].hidden = cameraIsLive[index];
+      document.querySelector(`#camera-status-${side}`).textContent = cameraIsLive[index] ? "Flujo del sensor activo" : "Cámara local desactivada";
+      document.querySelector(`#camera-kind-${side}`).textContent = cameraIsLive[index] ? "en vivo" : "ilustrativa";
+    }
+
+    async function connectLocalCameras() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        document.querySelector(".sensor-help").textContent = "Acceso a cámaras no disponible. Abre la página desde localhost o HTTPS y usa un navegador compatible.";
+        return;
+      }
+      await refreshCameraDevices();
+      let deviceIds = cameraDeviceSelects.map(select => select.value);
+      if (deviceIds.some(id => !id) || deviceIds[0] === deviceIds[1]) {
+        let permissionStream;
+        try {
+          permissionStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+        } catch (error) {
+          document.querySelector(".sensor-help").textContent = error.name === "NotAllowedError" ? "Permite el acceso a la cámara en el navegador y vuelve a intentarlo." : `No se pudo solicitar acceso a la cámara: ${error.message}`;
+          return;
+        }
+        permissionStream.getTracks().forEach(track => track.stop());
+        await refreshCameraDevices();
+        deviceIds = cameraDeviceSelects.map(select => select.value);
+      }
+      if (deviceIds.some(id => !id)) {
+        document.querySelector(".sensor-help").textContent = "No hay dos cámaras disponibles para mostrar ambas vistas.";
+        return;
+      }
+      if (deviceIds[0] === deviceIds[1]) {
+        document.querySelector(".sensor-help").textContent = "Selecciona dos cámaras diferentes para las vistas izquierda y derecha.";
+        return;
+      }
+      cameraStreams.forEach((stream, index) => { if (stream) stopLocalCamera(index); });
+      for (let index = 0; index < deviceIds.length; index += 1) {
+        const side = index === 0 ? "left" : "right";
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { deviceId: { exact: deviceIds[index] }, width: { ideal: 1280 }, height: { ideal: 720 } }
+          });
+          cameraStreams[index] = stream;
+          cameraVideos[index].srcObject = stream;
+          cameraVideos[index].closest(".camera-image").classList.add("local-active");
+          cameraEmptyStates[index].hidden = true;
+          cameraStamps[index].textContent = `CÁMARA LOCAL · CAM-${index === 0 ? "L" : "R"}`;
+          document.querySelector(`#camera-status-${side}`).textContent = "Cámara local activa";
+          document.querySelector(`#camera-kind-${side}`).textContent = "en vivo";
+          cameraDeviceSelects[index].disabled = true;
+        } catch (error) {
+          document.querySelector(`#camera-status-${side}`).textContent = "No disponible";
+          cameraEmptyStates[index].hidden = false;
+          cameraEmptyStates[index].querySelector("strong").textContent = "No se pudo abrir esta cámara";
+          cameraEmptyStates[index].querySelector("span").textContent = error.name === "NotAllowedError" ? "Permite el acceso a la cámara en el navegador" : error.message;
+        }
+      }
+      const activeCameras = cameraStreams.filter(Boolean).length;
+      cameraConnectButton.textContent = activeCameras ? "Desactivar cámaras" : "Activar cámaras";
+      document.querySelector(".sensor-help").textContent = activeCameras === 2 ? "Las dos cámaras locales están transmitiendo en esta página." : activeCameras === 1 ? "Una cámara está activa. Revisa los permisos o la disponibilidad de la otra." : "No se pudo activar ninguna cámara. Revisa permisos y dispositivos.";
+    }
+
+    cameraRefreshButton.addEventListener("click", refreshCameraDevices);
+    cameraConnectButton.addEventListener("click", () => {
+      if (cameraStreams.some(Boolean)) {
+        cameraStreams.forEach((stream, index) => { if (stream) stopLocalCamera(index); });
+        cameraConnectButton.textContent = "Activar cámaras";
+        document.querySelector(".sensor-help").textContent = "Cámaras locales desactivadas.";
+        return;
+      }
+      connectLocalCameras();
+    });
+    navigator.mediaDevices?.addEventListener?.("devicechange", refreshCameraDevices);
+    refreshCameraDevices();
 
     function solveInverseKinematics(target, elbow) {
       const beta = radians(target.beta);
@@ -682,7 +819,7 @@
       }
       if (Array.isArray(packet.tomatoes)) showTomatoes(packet.tomatoes);
       [packet.camera_left, packet.camera_right].forEach((source, index) => {
-        if (typeof source === "string" && /^(data:image\/(jpeg|png|webp);base64,|https:\/\/)/i.test(source)) {
+        if (!cameraStreams[index] && typeof source === "string" && /^(data:image\/(jpeg|png|webp);base64,|https:\/\/)/i.test(source)) {
           cameraImages[index].src = source;
           cameraIsLive[index] = true;
           cameraEmptyStates[index].hidden = true;
@@ -722,7 +859,7 @@
             stamp.textContent = `${cameraIsLive[index] ? "ÚLTIMA CAPTURA" : "CAPTURA SIMULADA"} · CAM-${index === 0 ? "L" : "R"}`;
             document.querySelector(`#camera-status-${side}`).textContent = cameraIsLive[index] ? "Flujo desconectado" : "Sin flujo en vivo";
             document.querySelector(`#camera-kind-${side}`).textContent = cameraIsLive[index] ? "última captura" : "ilustrativa";
-            cameraEmptyStates[index].hidden = false;
+            cameraEmptyStates[index].hidden = Boolean(cameraStreams[index]);
             cameraIsLive[index] = false;
           });
           document.querySelector(".sensor-help").textContent = "Conexión cerrada. Continúa la simulación cinemática local.";

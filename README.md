@@ -9,7 +9,7 @@ Panel web del proyecto integrador de la materia optativa de Inteligencia Artific
 3. En **Build and deployment**, selecciona **Deploy from a branch**, elige la rama principal y la carpeta `/(root)`, y guarda.
 4. Abre la URL que GitHub muestra en esa sección. La página se sirve desde `index.html`.
 
-La simulación local calcula la pose con el modelo cinemático y las dimensiones compartidas para el brazo. El modo **Control manual** solo mueve la simulación del navegador: no envía comandos a los motores. El modo **Autónomo** es de solo lectura y muestra la pose, detecciones e imágenes enviadas por el controlador del robot. Las fotos que aparecen sin conexión son ilustrativas y se muestran difuminadas. Para datos en vivo, la página necesita un gateway WebSocket; desde GitHub Pages debe ser `wss://`.
+La simulación local calcula la pose con el modelo cinemático y las dimensiones compartidas para el brazo. El modo **Control manual** solo mueve la simulación del navegador: no envía comandos a los motores. El modo **Autónomo** es de solo lectura y muestra la pose, detecciones e imágenes enviadas por el controlador del robot. En **Visión estereoscópica**, selecciona dos cámaras conectadas a la computadora y pulsa **Activar cámaras**; el navegador solicitará permiso. Para que el navegador pueda acceder, abre la página desde `localhost` o HTTPS. Esta vista muestra el video local, pero no calcula detecciones de tomates. Las cámaras del robot y sus detecciones requieren el gateway WebSocket; desde GitHub Pages debe ser `wss://`.
 
 ## Formato del flujo de sensores
 
@@ -27,4 +27,4 @@ Envía un objeto JSON por mensaje. `joints_deg` contiene q1–q4 en grados. `tar
 }
 ```
 
-Introduce la dirección del gateway en **Flujo de sensores por WebSocket** y pulsa **Conectar**. En control manual, selecciona **Usar coordenada** para llevar un tomate detectado al objetivo de la simulación. En modo autónomo la página no permite emitir órdenes: el controlador del robot debe decidir y ejecutar la recolección. Sin gateway no hay imágenes ni detecciones reales.
+Introduce la dirección del gateway en **Flujo de sensores por WebSocket** y pulsa **Conectar**. En control manual, selecciona **Usar coordenada** para llevar un tomate detectado al objetivo de la simulación. En modo autónomo la página no permite emitir órdenes: el controlador del robot debe decidir y ejecutar la recolección. Sin gateway no hay telemetría ni detecciones del robot; el video local de las cámaras conectadas a la computadora puede mostrarse por separado.
